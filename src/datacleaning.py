@@ -234,6 +234,58 @@ class DataCleaner:
         
         return included_df, excluded_df
     
+    def calculate_top_80_names(self, included_df: pd.DataFrame) -> Dict:
+        """
+        Calculate the top 80% most common names by frequency.
+        
+        Args:
+            included_df: DataFrame of included rows
+            
+        Returns:
+            Dictionary with top 80% names data
+        """
+        if included_df.empty:
+            return {
+                'total_records': 0,
+                'target_80_pct_count': 0,
+                'top_names_count': 0,
+                'top_names': [],
+                'coverage_pct': 0
+            }
+        
+        # Calculate name frequencies
+        name_counts = included_df['name'].value_counts().reset_index()
+        name_counts.columns = ['name', 'frequency']
+        
+        # Calculate cumulative count and percentage
+        total_records = len(included_df)
+        target_count = int(total_records * 0.8)
+        
+        cumulative_count = 0
+        top_names = []
+        
+        for idx, row in name_counts.iterrows():
+            cumulative_count += row['frequency']
+            top_names.append({
+                'name': row['name'],
+                'frequency': int(row['frequency']),
+                'percentage': round((row['frequency'] / total_records) * 100, 2)
+            })
+            
+            if cumulative_count >= target_count:
+                break
+        
+        actual_coverage = (cumulative_count / total_records) * 100 if total_records > 0 else 0
+        
+        return {
+            'total_records': total_records,
+            'target_80_pct_count': target_count,
+            'actual_count': cumulative_count,
+            'top_names_count': len(top_names),
+            'top_names': top_names,
+            'coverage_pct': round(actual_coverage, 2)
+        }
+    
     def get_summary_stats(self, included_df: pd.DataFrame, excluded_df: pd.DataFrame) -> Dict:
         """
         Calculate summary statistics for the dataset.
@@ -285,6 +337,9 @@ class DataCleaner:
         # Find duplicates (at least 2 of 4 fields match)
         duplicate_records = self.find_duplicate_records(included_df)
         
+        # Calculate top 80% names
+        top_80_data = self.calculate_top_80_names(included_df)
+        
         summary = {
             'dataset_sizes': {
                 'original_row_count': total_count,
@@ -300,7 +355,8 @@ class DataCleaner:
                 'unique_name_month_combinations': unique_name_month,
                 'unique_name_day_combinations': unique_name_day
             },
-            'duplicates': duplicate_records
+            'duplicates': duplicate_records,
+            'top_80_names': top_80_data
         }
         
         return summary
@@ -442,6 +498,9 @@ def save_reports(included_df: pd.DataFrame, excluded_df: pd.DataFrame,
     print("\nDuplicate Analysis:")
     print(f"  Duplicate groups: {summary_stats['duplicates']['total_duplicate_groups']}")
     print(f"  Records involved in duplicates: {summary_stats['duplicates']['total_duplicate_records']}")
+    print("\nTop 80% Names:")
+    print(f"  Names covering 80%: {summary_stats['top_80_names']['top_names_count']}")
+    print(f"  Actual coverage: {summary_stats['top_80_names']['coverage_pct']}%")
     print("="*60)
 
 

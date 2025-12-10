@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Upload and Data Cleaning Viewer</title>
+    <title>CSV Birth Data Viewer with Data Cleaning</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -58,6 +59,32 @@
         .clear-btn:hover { background: #c82333; }
         .clean-btn { background: #28a745; }
         .clean-btn:hover { background: #218838; }
+        .download-btn { background: #17a2b8; padding: 8px 16px; font-size: 14px; }
+        .download-btn:hover { background: #138496; }
+        
+        /* Filters */
+        .filter-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            min-width: 150px;
+        }
+        .filter-label {
+            font-weight: 500;
+            color: #666;
+        }
         
         /* Tabs */
         .tabs {
@@ -125,6 +152,33 @@
             margin-top: 3px;
         }
         
+        /* Charts */
+        .charts-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
         /* Tables */
         table {
             width: 100%;
@@ -142,6 +196,15 @@
             font-weight: 600;
             position: sticky;
             top: 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background: #5568d3;
+        }
+        th .sort-icon {
+            margin-left: 5px;
+            font-size: 12px;
         }
         tr:hover { background: #f5f5f5; }
         .no-data {
@@ -154,6 +217,9 @@
         /* Excluded table specific */
         .excluded-table th {
             background: #dc3545;
+        }
+        .excluded-table th:hover {
+            background: #c82333;
         }
         .exclusion-reason {
             color: #dc3545;
@@ -196,6 +262,11 @@
             margin-bottom: 10px;
         }
         
+        .download-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
         .badge {
             display: inline-block;
             padding: 4px 10px;
@@ -211,11 +282,61 @@
             background: #f8d7da;
             color: #721c24;
         }
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
         
         .row-id {
             font-family: monospace;
             font-size: 11px;
             color: #999;
+        }
+        
+        /* Duplicate groups */
+        .duplicate-groups {
+            margin-top: 20px;
+        }
+        .duplicate-group {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #ffc107;
+        }
+        .duplicate-group-header {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .duplicate-group-details {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Top 80% names */
+        .top-names-list {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .name-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .name-item:hover {
+            background: #f8f9fa;
+        }
+        .name-text {
+            font-weight: 500;
+            color: #333;
+        }
+        .name-stats {
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -262,9 +383,36 @@
                     <div class="stat-value">{{ summary_stats.uniqueness.unique_birthday_combinations }}</div>
                 </div>
                 <div class="stat-card" style="border-left-color: #6f42c1;">
+                    <div class="stat-label">Name+Year Combos</div>
+                    <div class="stat-value">{{ summary_stats.uniqueness.unique_name_year_combinations }}</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #e83e8c;">
+                    <div class="stat-label">Name+Month Combos</div>
+                    <div class="stat-value">{{ summary_stats.uniqueness.unique_name_month_combinations }}</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #fd7e14;">
+                    <div class="stat-label">Name+Day Combos</div>
+                    <div class="stat-value">{{ summary_stats.uniqueness.unique_name_day_combinations }}</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #20c997;">
                     <div class="stat-label">Duplicate Groups</div>
                     <div class="stat-value">{{ summary_stats.duplicates.total_duplicate_groups }}</div>
-                    <div class="stat-subtext">{{ summary_stats.duplicates.total_duplicate_records }} records involved</div>
+                    <div class="stat-subtext">{{ summary_stats.duplicates.total_duplicate_records }} records</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-section">
+            <h2>📊 Data Visualizations</h2>
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">Birth Year Distribution</div>
+                    <canvas id="yearChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Birth Month Distribution</div>
+                    <canvas id="monthChart"></canvas>
                 </div>
             </div>
         </div>
@@ -275,12 +423,22 @@
             <button class="tab active" onclick="showTab('original')">Original Data</button>
             {% if included_data %}
             <button class="tab" onclick="showTab('included')">
-                Included Data <span class="badge badge-success">{{ included_data|length }}</span>
+                Included Data <span class="badge badge-success">{{ total_included }}</span>
             </button>
             {% endif %}
             {% if excluded_data %}
             <button class="tab" onclick="showTab('excluded')">
-                Excluded Data <span class="badge badge-danger">{{ excluded_data|length }}</span>
+                Excluded Data <span class="badge badge-danger">{{ total_excluded }}</span>
+            </button>
+            {% endif %}
+            {% if summary_stats and summary_stats.top_80_names %}
+            <button class="tab" onclick="showTab('top80')">
+                Top 80% Names <span class="badge badge-warning">{{ summary_stats.top_80_names.top_names_count }}</span>
+            </button>
+            {% endif %}
+            {% if summary_stats and summary_stats.duplicates.total_duplicate_groups > 0 %}
+            <button class="tab" onclick="showTab('duplicates')">
+                Duplicates <span class="badge badge-warning">{{ summary_stats.duplicates.total_duplicate_groups }}</span>
             </button>
             {% endif %}
         </div>
@@ -340,17 +498,38 @@
         <div id="included-tab" class="tab-content">
             <div class="section-header">
                 <h2>✅ Included Data ({{ total_included }} records)</h2>
+                <div class="download-buttons">
+                    <a href="{{ url_for('download_included_csv') }}">
+                        <button class="download-btn">📥 Download CSV</button>
+                    </a>
+                    <a href="{{ url_for('download_included_pdf') }}">
+                        <button class="download-btn">📄 Download PDF</button>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-section">
+                <form method="get" action="{{ url_for('index') }}" class="filter-row">
+                    <span class="filter-label">Filters:</span>
+                    <input type="text" name="name_filter" placeholder="Name" class="filter-input" value="{{ name_filter }}">
+                    <input type="number" name="month_filter" placeholder="Month (1-12)" class="filter-input" value="{{ month_filter }}" min="1" max="12">
+                    <input type="number" name="year_filter" placeholder="Year" class="filter-input" value="{{ year_filter }}">
+                    <input type="number" name="day_filter" placeholder="Day (1-31)" class="filter-input" value="{{ day_filter }}" min="1" max="31">
+                    <button type="submit">Apply Filters</button>
+                    <a href="{{ url_for('index') }}"><button type="button" class="clear-btn">Clear Filters</button></a>
+                </form>
             </div>
 
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
                         <tr>
-                            <th>Row ID</th>
-                            <th>Name</th>
-                            <th>Birth Day</th>
-                            <th>Birth Month</th>
-                            <th>Birth Year</th>
+                            <th onclick="sortTable('row_id')">Row ID <span class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('name')">Name <span class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('birth_day')">Birth Day <span class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('birth_month')">Birth Month <span class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('birth_year')">Birth Year <span class="sort-icon">⇅</span></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -369,11 +548,11 @@
 
             <div class="pagination">
                 {% if included_page > 1 %}
-                <a href="{{ url_for('index', included_page=included_page-1) }}">&laquo; Previous</a>
+                <a href="{{ url_for('index', included_page=included_page-1, name_filter=name_filter, month_filter=month_filter, year_filter=year_filter, day_filter=day_filter) }}">&laquo; Previous</a>
                 {% endif %}
                 <span class="current-page">Page {{ included_page }} of {{ included_total_pages }}</span>
                 {% if included_page < included_total_pages %}
-                <a href="{{ url_for('index', included_page=included_page+1) }}">Next &raquo;</a>
+                <a href="{{ url_for('index', included_page=included_page+1, name_filter=name_filter, month_filter=month_filter, year_filter=year_filter, day_filter=day_filter) }}">Next &raquo;</a>
                 {% endif %}
             </div>
         </div>
@@ -384,6 +563,14 @@
         <div id="excluded-tab" class="tab-content">
             <div class="section-header">
                 <h2>❌ Excluded Data ({{ total_excluded }} records)</h2>
+                <div class="download-buttons">
+                    <a href="{{ url_for('download_excluded_csv') }}">
+                        <button class="download-btn">📥 Download CSV</button>
+                    </a>
+                    <a href="{{ url_for('download_excluded_pdf') }}">
+                        <button class="download-btn">📄 Download PDF</button>
+                    </a>
+                </div>
             </div>
 
             <div style="overflow-x: auto;">
@@ -425,6 +612,87 @@
         </div>
         {% endif %}
 
+        <!-- Top 80% Names Tab -->
+        {% if summary_stats and summary_stats.top_80_names %}
+        <div id="top80-tab" class="tab-content">
+            <div class="section-header">
+                <h2>🌟 Top 80% Most Common Names</h2>
+                <div class="download-buttons">
+                    <a href="{{ url_for('download_top80_csv') }}">
+                        <button class="download-btn">📥 Download CSV</button>
+                    </a>
+                    <a href="{{ url_for('download_top80_json') }}">
+                        <button class="download-btn">📄 Download JSON</button>
+                    </a>
+                </div>
+            </div>
+
+            <div class="summary-stats">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Records</div>
+                        <div class="stat-value">{{ summary_stats.top_80_names.total_records }}</div>
+                    </div>
+                    <div class="stat-card" style="border-left-color: #ffc107;">
+                        <div class="stat-label">Top Names Count</div>
+                        <div class="stat-value">{{ summary_stats.top_80_names.top_names_count }}</div>
+                    </div>
+                    <div class="stat-card" style="border-left-color: #28a745;">
+                        <div class="stat-label">Coverage</div>
+                        <div class="stat-value">{{ summary_stats.top_80_names.coverage_pct }}%</div>
+                        <div class="stat-subtext">{{ summary_stats.top_80_names.actual_count }} records</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="top-names-list">
+                {% for name_info in summary_stats.top_80_names.top_names %}
+                <div class="name-item">
+                    <div class="name-text">{{ loop.index }}. {{ name_info.name }}</div>
+                    <div class="name-stats">
+                        Frequency: <strong>{{ name_info.frequency }}</strong> 
+                        ({{ name_info.percentage }}%)
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Duplicates Tab -->
+        {% if summary_stats and summary_stats.duplicates.total_duplicate_groups > 0 %}
+        <div id="duplicates-tab" class="tab-content">
+            <h2>🔄 Duplicate Records Analysis</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Records where at least 2 of 4 fields (name, birth_day, birth_month, birth_year) match
+            </p>
+
+            <div class="duplicate-groups">
+                {% for group in summary_stats.duplicates.duplicate_groups[:20] %}
+                <div class="duplicate-group">
+                    <div class="duplicate-group-header">
+                        Group {{ loop.index }}: {{ group.count }} records matching 
+                        {% for field in group.matching_fields %}
+                            <strong>{{ field }}</strong>{% if not loop.last %} + {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="duplicate-group-details">
+                        Matching values: 
+                        {% for key, value in group.matching_values.items() %}
+                            {{ key }}=<strong>{{ value }}</strong>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% if summary_stats.duplicates.duplicate_groups|length > 20 %}
+                <p style="text-align: center; color: #999; margin-top: 15px;">
+                    Showing first 20 of {{ summary_stats.duplicates.duplicate_groups|length }} duplicate groups
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
     </div>
 
     <script>
@@ -443,6 +711,84 @@
             // Activate corresponding button
             event.target.classList.add('active');
         }
+
+        function sortTable(column) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentSort = urlParams.get('sort_by');
+            const currentOrder = urlParams.get('sort_order') || 'asc';
+            
+            // Toggle order if clicking same column
+            const newOrder = (currentSort === column && currentOrder === 'asc') ? 'desc' : 'asc';
+            
+            urlParams.set('sort_by', column);
+            urlParams.set('sort_order', newOrder);
+            
+            window.location.search = urlParams.toString();
+        }
+
+        // Load charts if data is available
+        {% if summary_stats %}
+        fetch('{{ url_for("get_chart_data") }}')
+            .then(response => response.json())
+            .then(data => {
+                // Year distribution chart
+                const yearCtx = document.getElementById('yearChart').getContext('2d');
+                new Chart(yearCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.year_distribution.labels,
+                        datasets: [{
+                            label: 'Number of People',
+                            data: data.year_distribution.values,
+                            backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Month distribution chart
+                const monthCtx = document.getElementById('monthChart').getContext('2d');
+                new Chart(monthCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.month_distribution.labels,
+                        datasets: [{
+                            label: 'Number of People',
+                            data: data.month_distribution.values,
+                            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+                            borderColor: 'rgba(40, 167, 69, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error('Error loading chart data:', error));
+        {% endif %}
     </script>
 </body>
 </html>
