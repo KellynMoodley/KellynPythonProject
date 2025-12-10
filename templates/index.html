@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CSV Upload and Display</title>
+    <title>CSV Upload and Data Cleaning Viewer</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 10px;
@@ -21,6 +21,8 @@
             padding: 30px;
         }
         h1 { color: #333; margin-bottom: 30px; text-align: center; }
+        h2 { color: #444; margin-bottom: 15px; }
+        
         .upload-section {
             background: #f8f9fa;
             padding: 20px;
@@ -54,6 +56,76 @@
         button:hover { background: #5568d3; }
         .clear-btn { background: #dc3545; }
         .clear-btn:hover { background: #c82333; }
+        .clean-btn { background: #28a745; }
+        .clean-btn:hover { background: #218838; }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: #f8f9fa;
+            border: none;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab:hover { background: #e9ecef; }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Summary Stats */
+        .summary-stats {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        .stat-subtext {
+            font-size: 12px;
+            color: #999;
+            margin-top: 3px;
+        }
+        
+        /* Tables */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -78,6 +150,18 @@
             color: #999;
             font-style: italic;
         }
+        
+        /* Excluded table specific */
+        .excluded-table th {
+            background: #dc3545;
+        }
+        .exclusion-reason {
+            color: #dc3545;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        /* Pagination */
         .pagination {
             margin-top: 15px;
             display: flex;
@@ -104,68 +188,261 @@
             background: #667eea;
             border-radius: 4px;
         }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .row-id {
+            font-family: monospace;
+            font-size: 11px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 CSV Birth Data Viewer</h1>
+        <h1>📊 CSV Birth Data Viewer with Data Cleaning</h1>
 
         <div class="upload-section">
             <form action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data" class="upload-form">
                 <input type="file" name="file" accept=".csv" required>
                 <button type="submit">Upload CSV</button>
+                {% if data %}
+                <button type="button" class="clean-btn" onclick="document.getElementById('cleanForm').submit()">Run Data Cleaning</button>
+                {% endif %}
             </form>
+            <form id="cleanForm" action="{{ url_for('clean_data') }}" method="post" style="display: none;"></form>
         </div>
 
-        {% if data %}
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2>Data Table ({{ data|length }} records)</h2>
-            <form action="{{ url_for('clear_data') }}" method="post" style="margin: 0;">
-                <button type="submit" class="clear-btn">Clear Data</button>
-            </form>
-        </div>
-
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>First Name</th>
-                        <th>Birth Day</th>
-                        <th>Birth Month</th>
-                        <th>Birth Year</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in data %}
-                    <tr>
-                        <td>{{ row.FirstName }}</td>
-                        <td>{{ row.BirthDay }}</td>
-                        <td>{{ row.BirthMonth }}</td>
-                        <td>{{ row.BirthYear }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="pagination">
-            {% if page > 1 %}
-            <a href="{{ url_for('index', page=page-1) }}">&laquo; Previous</a>
-            {% endif %}
-
-            <span class="current-page">Page {{ page }} of {{ total_pages }}</span>
-
-            {% if page < total_pages %}
-            <a href="{{ url_for('index', page=page+1) }}">Next &raquo;</a>
-            {% endif %}
-        </div>
-
-        {% else %}
-        <div class="no-data">
-            No data uploaded yet. Please upload a CSV file to view the data.
+        {% if summary_stats %}
+        <!-- Summary Statistics -->
+        <div class="summary-stats">
+            <h2>📈 Data Cleaning Summary</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Original Records</div>
+                    <div class="stat-value">{{ summary_stats.dataset_sizes.original_row_count }}</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #28a745;">
+                    <div class="stat-label">Included Records</div>
+                    <div class="stat-value">{{ summary_stats.dataset_sizes.included_row_count }}</div>
+                    <div class="stat-subtext">{{ summary_stats.dataset_sizes.pct_included_vs_original }}%</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #dc3545;">
+                    <div class="stat-label">Excluded Records</div>
+                    <div class="stat-value">{{ summary_stats.dataset_sizes.excluded_row_count }}</div>
+                    <div class="stat-subtext">{{ summary_stats.dataset_sizes.pct_excluded_vs_original }}%</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #ffc107;">
+                    <div class="stat-label">Unique Names</div>
+                    <div class="stat-value">{{ summary_stats.uniqueness.total_unique_names }}</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #17a2b8;">
+                    <div class="stat-label">Unique Birthdays</div>
+                    <div class="stat-value">{{ summary_stats.uniqueness.unique_birthday_combinations }}</div>
+                </div>
+                <div class="stat-card" style="border-left-color: #6f42c1;">
+                    <div class="stat-label">Duplicate Groups</div>
+                    <div class="stat-value">{{ summary_stats.duplicates.total_duplicate_groups }}</div>
+                    <div class="stat-subtext">{{ summary_stats.duplicates.total_duplicate_records }} records involved</div>
+                </div>
+            </div>
         </div>
         {% endif %}
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('original')">Original Data</button>
+            {% if included_data %}
+            <button class="tab" onclick="showTab('included')">
+                Included Data <span class="badge badge-success">{{ included_data|length }}</span>
+            </button>
+            {% endif %}
+            {% if excluded_data %}
+            <button class="tab" onclick="showTab('excluded')">
+                Excluded Data <span class="badge badge-danger">{{ excluded_data|length }}</span>
+            </button>
+            {% endif %}
+        </div>
+
+        <!-- Original Data Tab -->
+        <div id="original-tab" class="tab-content active">
+            {% if data %}
+            <div class="section-header">
+                <h2>Original Data ({{ data|length }} records)</h2>
+                <form action="{{ url_for('clear_data') }}" method="post" style="margin: 0;">
+                    <button type="submit" class="clear-btn">Clear All Data</button>
+                </form>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>First Name</th>
+                            <th>Birth Day</th>
+                            <th>Birth Month</th>
+                            <th>Birth Year</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data %}
+                        <tr>
+                            <td>{{ row.FirstName }}</td>
+                            <td>{{ row.BirthDay }}</td>
+                            <td>{{ row.BirthMonth }}</td>
+                            <td>{{ row.BirthYear }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="{{ url_for('index', page=page-1) }}">&laquo; Previous</a>
+                {% endif %}
+                <span class="current-page">Page {{ page }} of {{ total_pages }}</span>
+                {% if page < total_pages %}
+                <a href="{{ url_for('index', page=page+1) }}">Next &raquo;</a>
+                {% endif %}
+            </div>
+
+            {% else %}
+            <div class="no-data">
+                No data uploaded yet. Please upload a CSV file to view the data.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Included Data Tab -->
+        {% if included_data %}
+        <div id="included-tab" class="tab-content">
+            <div class="section-header">
+                <h2>✅ Included Data ({{ total_included }} records)</h2>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Row ID</th>
+                            <th>Name</th>
+                            <th>Birth Day</th>
+                            <th>Birth Month</th>
+                            <th>Birth Year</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in included_data %}
+                        <tr>
+                            <td class="row-id">{{ row.row_id }}</td>
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.birth_day }}</td>
+                            <td>{{ row.birth_month }}</td>
+                            <td>{{ row.birth_year }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination">
+                {% if included_page > 1 %}
+                <a href="{{ url_for('index', included_page=included_page-1) }}">&laquo; Previous</a>
+                {% endif %}
+                <span class="current-page">Page {{ included_page }} of {{ included_total_pages }}</span>
+                {% if included_page < included_total_pages %}
+                <a href="{{ url_for('index', included_page=included_page+1) }}">Next &raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Excluded Data Tab -->
+        {% if excluded_data %}
+        <div id="excluded-tab" class="tab-content">
+            <div class="section-header">
+                <h2>❌ Excluded Data ({{ total_excluded }} records)</h2>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="excluded-table">
+                    <thead>
+                        <tr>
+                            <th>Row ID</th>
+                            <th>Name</th>
+                            <th>Birth Day</th>
+                            <th>Birth Month</th>
+                            <th>Birth Year</th>
+                            <th>Exclusion Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in excluded_data %}
+                        <tr>
+                            <td class="row-id">{{ row.row_id }}</td>
+                            <td>{{ row.name if row.name else '-' }}</td>
+                            <td>{{ row.birth_day if row.birth_day else '-' }}</td>
+                            <td>{{ row.birth_month if row.birth_month else '-' }}</td>
+                            <td>{{ row.birth_year if row.birth_year else '-' }}</td>
+                            <td class="exclusion-reason">{{ row.exclusion_reason }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination">
+                {% if excluded_page > 1 %}
+                <a href="{{ url_for('index', excluded_page=excluded_page-1) }}">&laquo; Previous</a>
+                {% endif %}
+                <span class="current-page">Page {{ excluded_page }} of {{ excluded_total_pages }}</span>
+                {% if excluded_page < excluded_total_pages %}
+                <a href="{{ url_for('index', excluded_page=excluded_page+1) }}">Next &raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
     </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Deactivate all tab buttons
+            const tabButtons = document.querySelectorAll('.tab');
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Activate corresponding button
+            event.target.classList.add('active');
+        }
+    </script>
 </body>
 </html>
